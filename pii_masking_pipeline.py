@@ -189,16 +189,25 @@ def detect_pii(
         score_threshold=score_threshold,
         return_decision_process=False,
     )
-    spans = [
-        PIISpan(
-            entity_type=r.entity_type,
-            start=r.start,
-            end=r.end,
-            score=float(r.score),
-            text=text[r.start: r.end],
+    spans = []
+    for r in results:
+        start = r.start
+        end = r.end
+        # Presidio sometimes starts a span on a delimiter character that
+        # immediately precedes the entity (e.g. '<' before an email address,
+        # or ':' before a name).  Strip any leading non-alphanumeric characters
+        # so the span aligns with the first meaningful character of the entity.
+        while start < end and not text[start].isalnum():
+            start += 1
+        spans.append(
+            PIISpan(
+                entity_type=r.entity_type,
+                start=start,
+                end=end,
+                score=float(r.score),
+                text=text[start:end],
+            )
         )
-        for r in results
-    ]
     return sorted(spans, key=lambda s: s.start)
 
 
@@ -556,8 +565,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="HuggingFace model ID for the tokenizer.",
     )
     ap.add_argument(
-        "--max-length", type=int, default=512,
-        help="Maximum token sequence length (truncation applied beyond this).",
+        "--max-length", type=int, default=2048,
+        help=(
+            "Maximum token sequence length (truncation applied beyond this). "
+            "Enron emails average ~1 000 chars; default 2048 tokens keeps most "
+            "emails whole.  Lower to 512 to trade coverage for speed."
+        ),
     )
 
     # --- Batching & output ---
