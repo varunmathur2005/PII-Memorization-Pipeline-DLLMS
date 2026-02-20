@@ -336,25 +336,40 @@ def process_example(
     Returns:
         A populated :class:`MaskedExample`.
     """
-    pii_spans = detect_pii(
-        analyzer=analyzer,
-        text=text,
-        language=language,
-        entities=entities,
-        score_threshold=score_threshold,
-    )
+    try:
+        pii_spans = detect_pii(
+            analyzer=analyzer,
+            text=text,
+            language=language,
+            entities=entities,
+            score_threshold=score_threshold,
+        )
 
-    token_ids, offset_mapping = tokenize_with_offsets(
-        tokenizer=tokenizer,
-        text=text,
-        max_length=max_length,
-    )
+        token_ids, offset_mapping = tokenize_with_offsets(
+            tokenizer=tokenizer,
+            text=text,
+            max_length=max_length,
+        )
 
-    mask_tensor = build_pii_mask(
-        offset_mapping=offset_mapping,
-        pii_spans=pii_spans,
-        target_entity=target_entity,
-    )
+        mask_tensor = build_pii_mask(
+            offset_mapping=offset_mapping,
+            pii_spans=pii_spans,
+            target_entity=target_entity,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "Example %d failed (%s: %s) — returning empty result.",
+            example_index, type(exc).__name__, exc,
+        )
+        return MaskedExample(
+            example_index=example_index,
+            original_text=text,
+            token_ids=[],
+            offset_mapping=[],
+            pii_spans=[],
+            target_entity=target_entity,
+            mask=[],
+        )
 
     return MaskedExample(
         example_index=example_index,
@@ -554,6 +569,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--output", default="pii_masked.jsonl",
         help="Output JSONL file path.",
     )
+    ap.add_argument(
+        "--summary", default="pii_masked_summary.json",
+        help="Output summary JSON file path.",
+    )
 
     return ap
 
@@ -648,6 +667,31 @@ def main() -> None:
             flush_batch()
             batch.clear()
 
+    # -------------------------------------------------------------- summary
+    summary = {
+        "dataset": args.dataset,
+        "config": args.config,
+        "split": args.split,
+        "streaming": bool(args.streaming),
+        "max_examples": args.max_examples,
+        "text_field": args.text_field,
+        "tokenizer": args.tokenizer,
+        "spacy_model": args.spacy_model,
+        "score_threshold": args.score_threshold,
+        "entities_filter": entities_filter,
+        "target_entity": args.target_entity,
+        "max_length": args.max_length,
+        "total_examples_processed": total_examples,
+        "examples_skipped": skipped,
+        "examples_with_target_pii": examples_with_target_pii,
+        "target_pii_hit_rate": examples_with_target_pii / max(total_examples, 1),
+        "hits_by_entity_type": dict(
+            sorted(entity_counter.items(), key=lambda kv: kv[1], reverse=True)
+        ),
+    }
+    with open(args.summary, "w", encoding="utf-8") as f_sum:
+        json.dump(summary, f_sum, ensure_ascii=False, indent=2)
+
     # -------------------------------------------------------------- final log
     log.info("─" * 60)
     log.info("Done.")
@@ -667,6 +711,7 @@ def main() -> None:
         ),
     )
     log.info("  Output written to  : %s", args.output)
+    log.info("  Summary written to : %s", args.summary)
 
 
 if __name__ == "__main__":
