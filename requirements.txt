@@ -1,0 +1,15 @@
+# Core ML / tokenization
+torch>=2.10.0
+transformers>=5.2.0
+
+# Dataset loading
+datasets>=4.5.0
+
+# PII detection
+presidio-analyzer>=2.2.361
+spacy>=3.8.11
+# After installing spaCy, download the English model:
+#   python -m spacy download en_core_web_lg
+
+# Progress bar
+tqdm>=4.67.3

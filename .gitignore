@@ -1,0 +1,13 @@
+# Virtual environments
+venv/
+.venv/
+
+# VS Code
+.vscode/
+
+# Output / scratch files
+*.jsonl
+*.json
+__pycache__/
+*.py[cod]
+.DS_Store
