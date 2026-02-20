@@ -190,10 +190,6 @@ def detect_pii(
     for r in results:
         start = r.start
         end = r.end
-        # Presidio sometimes starts a span on a delimiter character that
-        # immediately precedes the entity (e.g. '<' before an email address,
-        # or ':' before a name).  Strip any leading non-alphanumeric characters
-        # so the span aligns with the first meaningful character of the entity.
         while start < end and not text[start].isalnum():
             start += 1
         spans.append(
@@ -294,13 +290,12 @@ def build_pii_mask(
         return mask
 
     for i, (tok_start, tok_end) in enumerate(offset_mapping):
-        # (0, 0) marks special tokens – skip
         if tok_start == 0 and tok_end == 0:
             continue
         for span_start, span_end in target_spans:
             if tok_start < span_end and tok_end > span_start:
                 mask[i] = True
-                break   # one overlap is enough; move to the next token
+                break 
 
     return mask
 
