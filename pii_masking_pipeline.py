@@ -64,14 +64,11 @@ class PIISpan:
 
 @dataclass
 class MaskedExample:
-    """Complete output for one processed example."""
     example_index: int
     original_text: str
-    token_ids: List[int]
-    offset_mapping: List[Tuple[int, int]]   # (char_start, char_end) per token
     pii_spans: List[PIISpan]
     target_entity: str
-    mask: List[int]     # 1-D boolean mask as a plain Python list (int 0/1)
+    mask: List[int]
 
 
 # ---------------------------------------------------------------------------
@@ -337,7 +334,7 @@ def process_example(
         A populated :class:`MaskedExample`.
     """
     try:
-        pii_spans = detect_pii(
+        all_spans = detect_pii(
             analyzer=analyzer,
             text=text,
             language=language,
@@ -345,6 +342,11 @@ def process_example(
             score_threshold=score_threshold,
         )
 
+        pii_spans = [
+            s for s in all_spans
+            if s.entity_type == target_entity
+        ]
+        
         token_ids, offset_mapping = tokenize_with_offsets(
             tokenizer=tokenizer,
             text=text,
@@ -374,8 +376,6 @@ def process_example(
     return MaskedExample(
         example_index=example_index,
         original_text=text,
-        token_ids=token_ids,
-        offset_mapping=offset_mapping,
         pii_spans=pii_spans,
         target_entity=target_entity,
         mask=mask_tensor.int().tolist(),
@@ -449,8 +449,6 @@ def masked_example_to_dict(me: MaskedExample) -> Dict[str, Any]:
     return {
         "example_index": me.example_index,
         "original_text": me.original_text,
-        "token_ids": me.token_ids,
-        "offset_mapping": [list(o) for o in me.offset_mapping],
         "pii_spans": [
             {
                 "entity_type": s.entity_type,
