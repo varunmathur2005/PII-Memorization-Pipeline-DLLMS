@@ -171,8 +171,6 @@ class TestMaskedExampleToDict:
         return MaskedExample(
             example_index=7,
             original_text="Send to alice@example.com please.",
-            token_ids=[1, 2, 3, 4, 5],
-            offset_mapping=[(0, 0), (0, 4), (5, 7), (8, 27), (28, 33)],
             pii_spans=[
                 PIISpan("EMAIL_ADDRESS", 8, 27, 1.0, "alice@example.com")
             ],
@@ -183,8 +181,8 @@ class TestMaskedExampleToDict:
     def test_all_keys_present(self):
         d = masked_example_to_dict(self._make_example())
         expected_keys = {
-            "example_index", "original_text", "token_ids",
-            "offset_mapping", "pii_spans", "target_entity", "mask",
+            "example_index", "original_text",
+            "pii_spans", "target_entity", "mask",
         }
         assert set(d.keys()) == expected_keys
 
@@ -198,11 +196,11 @@ class TestMaskedExampleToDict:
         d = masked_example_to_dict(self._make_example())
         assert all(isinstance(v, int) for v in d["mask"])
 
-    def test_offset_mapping_is_list_of_lists(self):
+    def test_pii_spans_is_list_of_dicts(self):
         d = masked_example_to_dict(self._make_example())
-        for pair in d["offset_mapping"]:
-            assert isinstance(pair, list)
-            assert len(pair) == 2
+        assert isinstance(d["pii_spans"], list)
+        for span in d["pii_spans"]:
+            assert isinstance(span, dict)
 
     def test_pii_span_fields(self):
         d = masked_example_to_dict(self._make_example())
@@ -213,7 +211,7 @@ class TestMaskedExampleToDict:
         assert span["text"] == "alice@example.com"
 
     def test_empty_mask_and_spans(self):
-        ex = MaskedExample(7, "hi", [], [], [], "EMAIL_ADDRESS", [])
+        ex = MaskedExample(7, "hi", [], "EMAIL_ADDRESS", [])
         d = masked_example_to_dict(ex)
         assert d["mask"] == []
         assert d["pii_spans"] == []
@@ -297,7 +295,7 @@ class TestProcessExample:
 
         assert isinstance(result, MaskedExample)
         assert result.example_index == 0
-        assert result.token_ids == token_ids
+        assert result.pii_spans == spans
         assert len(result.mask) == len(token_ids)
 
     def test_mask_marks_correct_token(self):
@@ -325,7 +323,7 @@ class TestProcessExample:
                 42, "some text", MagicMock(), MagicMock(), "EMAIL_ADDRESS"
             )
         assert result.example_index == 42
-        assert result.token_ids == []
+        assert result.pii_spans == []
         assert result.mask == []
 
     def test_no_target_pii_all_zeros(self):
