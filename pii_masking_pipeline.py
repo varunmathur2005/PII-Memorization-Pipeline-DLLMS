@@ -370,8 +370,6 @@ def process_example(
         return MaskedExample(
             example_index=example_index,
             original_text=text,
-            token_ids=[],
-            offset_mapping=[],
             pii_spans=[],
             target_entity=target_entity,
             mask=[],
